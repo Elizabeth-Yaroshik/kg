@@ -34,7 +34,8 @@ public class RasterAlgorithmsLab {
     private static void setupTopControls(JPanel controlPanel, RasterPanel panel, JTextArea coordinatesArea) {
         controlPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-        String[] algs = {"ЦДА", "Брезенхем (линия)", "Брезенхем (окружность)", "Пошаговый алгоритм"};
+        String[] algs = {"ЦДА", "Брезенхем (линия)", "Брезенхем (окружность)", "Пошаговый алгоритм",
+                "Кастла-Питвея", "Сглаживание Ву"};
         JComboBox<String> algoBox = new JComboBox<>(algs);
         controlPanel.add(new JLabel("Алгоритм:"));
         controlPanel.add(algoBox);
@@ -79,7 +80,7 @@ public class RasterAlgorithmsLab {
             int r  = Integer.parseInt(radf.getText());
 
             long start = System.nanoTime();
-            List<Point> pixels = new ArrayList<>();
+            List<PixelPoint> pixels = new ArrayList<>();
             switch (alg) {
                 case "ЦДА":
                     pixels = Algorithms.ddaLine(x1,y1,x2,y2);
@@ -92,6 +93,12 @@ public class RasterAlgorithmsLab {
                     break;
                 case "Пошаговый алгоритм":
                     pixels = Algorithms.stepByStepLine(x1,y1,x2,y2);
+                    break;
+                case "Кастла-Питвея":
+                    pixels = Algorithms.castlePitwayLine(x1,y1,x2,y2);
+                    break;
+                case "Сглаживание Ву":
+                    pixels = Algorithms.wuLine(x1,y1,x2,y2);
                     break;
             }
             long end = System.nanoTime();
@@ -111,7 +118,7 @@ public class RasterAlgorithmsLab {
     }
 
     private static void updateCoordinatesArea(JTextArea area, String algorithm,
-                                              List<Point> pixels, int x1, int y1,
+                                              List<PixelPoint> pixels, int x1, int y1,
                                               int x2, int y2, int radius,
                                               long startTime, long endTime) {
         StringBuilder sb = new StringBuilder();
@@ -133,8 +140,13 @@ public class RasterAlgorithmsLab {
         sb.append("Построенные точки:\n");
         int count = Math.min(50, pixels.size());
         for (int i = 0; i < count; i++) {
-            Point p = pixels.get(i);
-            sb.append(i + 1).append(": (").append(p.x).append(", ").append(p.y).append(")\n");
+            PixelPoint p = pixels.get(i);
+            if (algorithm.equals("Сглаживание Ву")) {
+                sb.append(i + 1).append(": (").append(p.x).append(", ").append(p.y)
+                        .append(") интенсивность: ").append(String.format("%.2f", p.intensity)).append("\n");
+            } else {
+                sb.append(i + 1).append(": (").append(p.x).append(", ").append(p.y).append(")\n");
+            }
         }
         if (pixels.size() > 50) {
             sb.append("... и еще ").append(pixels.size() - 50).append(" точек");
@@ -144,9 +156,26 @@ public class RasterAlgorithmsLab {
     }
 }
 
+class PixelPoint {
+    public int x, y;
+    public float intensity;
+
+    public PixelPoint(int x, int y) {
+        this.x = x;
+        this.y = y;
+        this.intensity = 1.0f;
+    }
+
+    public PixelPoint(int x, int y, float intensity) {
+        this.x = x;
+        this.y = y;
+        this.intensity = intensity;
+    }
+}
+
 class RasterPanel extends JPanel {
-    private int scale = 20; 
-    private List<Point> pixels = new ArrayList<>();
+    private int scale = 20;
+    private List<PixelPoint> pixels = new ArrayList<>();
     private boolean showGrid = true;
 
     public RasterPanel() {
@@ -155,7 +184,7 @@ class RasterPanel extends JPanel {
     }
 
     public void setScale(int s) { this.scale = Math.max(1, s); }
-    public void setPixels(List<Point> p) { this.pixels = p; }
+    public void setPixels(List<PixelPoint> p) { this.pixels = p; }
     public void clear() { this.pixels = new ArrayList<>(); repaint(); }
 
     @Override
@@ -207,28 +236,35 @@ class RasterPanel extends JPanel {
 
         int pointSize = Math.max(2, scale / 3);
 
-        g.setColor(Color.red);
-        for (Point p : pixels) {
+        for (PixelPoint p : pixels) {
             int sx = cx + p.x * scale;
             int sy = cy - p.y * scale;
+
+            if (p.intensity < 1.0f) {
+                int red = 255;
+                int greenBlue = (int)(255 * (1 - p.intensity));
+                g.setColor(new Color(red, greenBlue, greenBlue));
+            } else {
+                g.setColor(Color.red);
+            }
+
             g.fillRect(sx - pointSize/2, sy - pointSize/2, pointSize, pointSize);
 
             g.setColor(Color.black);
             g.drawRect(sx - pointSize/2, sy - pointSize/2, pointSize, pointSize);
-            g.setColor(Color.red);
         }
     }
 }
 
 class Algorithms {
-    public static List<Point> ddaLine(int x1, int y1, int x2, int y2) {
-        List<Point> pts = new ArrayList<>();
+    public static List<PixelPoint> ddaLine(int x1, int y1, int x2, int y2) {
+        List<PixelPoint> pts = new ArrayList<>();
         int dx = x2 - x1;
         int dy = y2 - y1;
         int steps = Math.max(Math.abs(dx), Math.abs(dy));
 
         if (steps == 0) {
-            pts.add(new Point(x1, y1));
+            pts.add(new PixelPoint(x1, y1));
             return pts;
         }
 
@@ -237,15 +273,15 @@ class Algorithms {
         double yInc = dy / (double) steps;
 
         for (int i = 0; i <= steps; i++) {
-            pts.add(new Point((int)Math.round(x), (int)Math.round(y)));
+            pts.add(new PixelPoint((int)Math.round(x), (int)Math.round(y)));
             x += xInc;
             y += yInc;
         }
         return pts;
     }
 
-    public static List<Point> bresenhamLine(int x1, int y1, int x2, int y2) {
-        List<Point> pts = new ArrayList<>();
+    public static List<PixelPoint> bresenhamLine(int x1, int y1, int x2, int y2) {
+        List<PixelPoint> pts = new ArrayList<>();
         int dx = Math.abs(x2 - x1);
         int dy = Math.abs(y2 - y1);
         int sx = x1 < x2 ? 1 : -1;
@@ -256,7 +292,7 @@ class Algorithms {
         int currentY = y1;
 
         while (true) {
-            pts.add(new Point(currentX, currentY));
+            pts.add(new PixelPoint(currentX, currentY));
             if (currentX == x2 && currentY == y2) break;
 
             int err2 = 2 * err;
@@ -274,8 +310,8 @@ class Algorithms {
         return pts;
     }
 
-    public static List<Point> bresenhamCircle(int xc, int yc, int r) {
-        List<Point> pts = new ArrayList<>();
+    public static List<PixelPoint> bresenhamCircle(int xc, int yc, int r) {
+        List<PixelPoint> pts = new ArrayList<>();
         int x = 0;
         int y = r;
         int d = 3 - 2 * r;
@@ -295,8 +331,8 @@ class Algorithms {
         return pts;
     }
 
-    public static List<Point> stepByStepLine(int x1, int y1, int x2, int y2) {
-        List<Point> points = new ArrayList<>();
+    public static List<PixelPoint> stepByStepLine(int x1, int y1, int x2, int y2) {
+        List<PixelPoint> points = new ArrayList<>();
 
         int dx = x2 - x1;
         int dy = y2 - y1;
@@ -312,7 +348,7 @@ class Algorithms {
             float y = y1;
 
             for (int x = x1; x <= x2; x++) {
-                points.add(new Point(x, Math.round(y)));
+                points.add(new PixelPoint(x, Math.round(y)));
                 y += k;
             }
         } else {
@@ -326,7 +362,7 @@ class Algorithms {
             float x = x1;
 
             for (int y = y1; y <= y2; y++) {
-                points.add(new Point(Math.round(x), y));
+                points.add(new PixelPoint(Math.round(x), y));
                 x += k;
             }
         }
@@ -334,14 +370,92 @@ class Algorithms {
         return points;
     }
 
-    private static void add8(List<Point> pts, int xc, int yc, int x, int y) {
-        pts.add(new Point(xc + x, yc + y));
-        pts.add(new Point(xc - x, yc + y));
-        pts.add(new Point(xc + x, yc - y));
-        pts.add(new Point(xc - x, yc - y));
-        pts.add(new Point(xc + y, yc + x));
-        pts.add(new Point(xc - y, yc + x));
-        pts.add(new Point(xc + y, yc - x));
-        pts.add(new Point(xc - y, yc - x));
+    public static List<PixelPoint> castlePitwayLine(int x1, int y1, int x2, int y2) {
+        List<PixelPoint> pts = new ArrayList<>();
+        int dx = Math.abs(x2 - x1);
+        int dy = Math.abs(y2 - y1);
+
+        int sx = x1 < x2 ? 1 : -1;
+        int sy = y1 < y2 ? 1 : -1;
+
+        int currentX = x1;
+        int currentY = y1;
+
+        if (dx >= dy) {
+            int err = 2 * dy - dx;
+
+            for (int i = 0; i <= dx; i++) {
+                pts.add(new PixelPoint(currentX, currentY));
+                if (err >= 0) {
+                    currentY += sy;
+                    err -= 2 * dx;
+                }
+                err += 2 * dy;
+                currentX += sx;
+            }
+        } else {
+            int err = 2 * dx - dy;
+
+            for (int i = 0; i <= dy; i++) {
+                pts.add(new PixelPoint(currentX, currentY));
+                if (err >= 0) {
+                    currentX += sx;
+                    err -= 2 * dy;
+                }
+                err += 2 * dx;
+                currentY += sy;
+            }
+        }
+
+        return pts;
+    }
+
+    public static List<PixelPoint> wuLine(int x1, int y1, int x2, int y2) {
+        List<PixelPoint> pts = new ArrayList<>();
+
+        boolean steep = Math.abs(y2 - y1) > Math.abs(x2 - x1);
+
+        if (steep) {
+            int temp = x1; x1 = y1; y1 = temp;
+            temp = x2; x2 = y2; y2 = temp;
+        }
+
+        if (x1 > x2) {
+            int temp = x1; x1 = x2; x2 = temp;
+            temp = y1; y1 = y2; y2 = temp;
+        }
+
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float gradient = dx == 0 ? 1 : dy / dx;
+
+        float y = y1;
+        for (int x = x1; x <= x2; x++) {
+            if (steep) {
+                pts.add(new PixelPoint((int)Math.floor(y), x, 1 - fractionalPart(y)));
+                pts.add(new PixelPoint((int)Math.floor(y) + 1, x, fractionalPart(y)));
+            } else {
+                pts.add(new PixelPoint(x, (int)Math.floor(y), 1 - fractionalPart(y)));
+                pts.add(new PixelPoint(x, (int)Math.floor(y) + 1, fractionalPart(y)));
+            }
+            y += gradient;
+        }
+
+        return pts;
+    }
+
+    private static float fractionalPart(float x) {
+        return x - (float)Math.floor(x);
+    }
+
+    private static void add8(List<PixelPoint> pts, int xc, int yc, int x, int y) {
+        pts.add(new PixelPoint(xc + x, yc + y));
+        pts.add(new PixelPoint(xc - x, yc + y));
+        pts.add(new PixelPoint(xc + x, yc - y));
+        pts.add(new PixelPoint(xc - x, yc - y));
+        pts.add(new PixelPoint(xc + y, yc + x));
+        pts.add(new PixelPoint(xc - y, yc + x));
+        pts.add(new PixelPoint(xc + y, yc - x));
+        pts.add(new PixelPoint(xc - y, yc - x));
     }
 }
