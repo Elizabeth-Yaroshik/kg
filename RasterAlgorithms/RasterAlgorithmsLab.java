@@ -1,328 +1,263 @@
-package lab3;
-
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.image.BufferedImage;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
 
-public class RasterAlgorithmsLab extends JFrame {
-    private AlgorithmPanel algorithmPanel;
-    private JComboBox<String> algorithmComboBox;
-    private JTextField x1Field, y1Field, x2Field, y2Field;
-    private JTextField radiusField;
-    private JButton drawButton;
-    private JButton clearButton;
-    private JTextArea calculationArea;
-
-    public RasterAlgorithmsLab() {
-        setTitle("Лабораторная работа 3 - Растровые алгоритмы");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1200, 800);
-        setLocationRelativeTo(null);
-
-        initializeComponents();
-        setupLayout();
-    }
-
-    private void initializeComponents() {
-        algorithmPanel = new AlgorithmPanel();
-
-        String[] algorithms = {
-                "Пошаговый алгоритм",
-                "Алгоритм ЦДА",
-                "Алгоритм Брезенхема (линия)",
-                "Алгоритм Брезенхема (окружность)"
-        };
-        algorithmComboBox = new JComboBox<>(algorithms);
-
-        x1Field = new JTextField("10", 5);
-        y1Field = new JTextField("10", 5);
-        x2Field = new JTextField("20", 5);
-        y2Field = new JTextField("15", 5);
-        radiusField = new JTextField("5", 5);
-
-        drawButton = new JButton("Нарисовать");
-        clearButton = new JButton("Очистить");
-
-        calculationArea = new JTextArea(10, 30);
-        calculationArea.setEditable(false);
-
-        drawButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                drawShape();
-            }
-        });
-
-        clearButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                algorithmPanel.clear();
-                calculationArea.setText("");
-            }
-        });
-    }
-
-    private void setupLayout() {
-        setLayout(new BorderLayout());
-
-        JPanel controlPanel = new JPanel();
-        controlPanel.setLayout(new GridLayout(2, 1));
-
-        JPanel inputPanel = new JPanel();
-        inputPanel.add(new JLabel("Алгоритм:"));
-        inputPanel.add(algorithmComboBox);
-        inputPanel.add(new JLabel("x1:"));
-        inputPanel.add(x1Field);
-        inputPanel.add(new JLabel("y1:"));
-        inputPanel.add(y1Field);
-        inputPanel.add(new JLabel("x2:"));
-        inputPanel.add(x2Field);
-        inputPanel.add(new JLabel("y2:"));
-        inputPanel.add(y2Field);
-        inputPanel.add(new JLabel("Радиус:"));
-        inputPanel.add(radiusField);
-
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.add(drawButton);
-        buttonPanel.add(clearButton);
-
-        controlPanel.add(inputPanel);
-        controlPanel.add(buttonPanel);
-
-        JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.add(controlPanel, BorderLayout.NORTH);
-        mainPanel.add(algorithmPanel, BorderLayout.CENTER);
-
-        JScrollPane calculationScroll = new JScrollPane(calculationArea);
-        calculationScroll.setPreferredSize(new Dimension(400, 0));
-
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, mainPanel, calculationScroll);
-        splitPane.setDividerLocation(800);
-
-        add(splitPane, BorderLayout.CENTER);
-    }
-
-    private void drawShape() {
-        try {
-            int x1 = Integer.parseInt(x1Field.getText());
-            int y1 = Integer.parseInt(y1Field.getText());
-            int x2 = Integer.parseInt(x2Field.getText());
-            int y2 = Integer.parseInt(y2Field.getText());
-            int radius = Integer.parseInt(radiusField.getText());
-
-            String selectedAlgorithm = (String) algorithmComboBox.getSelectedItem();
-            algorithmPanel.drawShape(selectedAlgorithm, x1, y1, x2, y2, radius, calculationArea);
-
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Пожалуйста, введите корректные числовые значения", "Ошибка", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
+public class RasterAlgorithmsLab {
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new RasterAlgorithmsLab().setVisible(true);
-            }
+        SwingUtilities.invokeLater(() -> {
+            JFrame frame = new JFrame("Демонстрация растровых алгоритмов с координатами");
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setSize(1200, 800);
+
+            RasterPanel panel = new RasterPanel();
+
+            JTextArea coordinatesArea = new JTextArea(15, 30);
+            coordinatesArea.setEditable(false);
+            JScrollPane coordinatesScroll = new JScrollPane(coordinatesArea);
+            coordinatesScroll.setPreferredSize(new Dimension(350, 0));
+
+            JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panel, coordinatesScroll);
+            splitPane.setDividerLocation(800);
+
+            JPanel topControlPanel = new JPanel();
+            setupTopControls(topControlPanel, panel, coordinatesArea);
+
+            frame.setLayout(new BorderLayout());
+            frame.add(topControlPanel, BorderLayout.NORTH);
+            frame.add(splitPane, BorderLayout.CENTER);
+
+            frame.setVisible(true);
         });
     }
-}
 
-class AlgorithmPanel extends JPanel {
-    private BufferedImage buffer;
-    private Graphics2D g2d;
-    private List<Point> drawnPoints;
-    private static final int GRID_SIZE = 10;
-    private static final int ORIGIN_X = 400;
-    private static final int ORIGIN_Y = 300;
+    private static void setupTopControls(JPanel controlPanel, RasterPanel panel, JTextArea coordinatesArea) {
+        controlPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-    public AlgorithmPanel() {
-        setBackground(Color.WHITE);
-        setPreferredSize(new Dimension(800, 600));
-        drawnPoints = new ArrayList<>();
+        String[] algs = {"ЦДА", "Брезенхем (линия)", "Брезенхем (окружность)", "Пошаговый алгоритм"};
+        JComboBox<String> algoBox = new JComboBox<>(algs);
+        controlPanel.add(new JLabel("Алгоритм:"));
+        controlPanel.add(algoBox);
 
-        buffer = new BufferedImage(800, 600, BufferedImage.TYPE_INT_RGB);
-        g2d = buffer.createGraphics();
-        clear();
-    }
+        controlPanel.add(new JLabel("Масштаб:"));
+        JSlider scaleSlider = new JSlider(5, 60, 20);
+        scaleSlider.setMajorTickSpacing(5);
+        scaleSlider.setPaintTicks(true);
+        scaleSlider.setPreferredSize(new Dimension(150, 40));
+        controlPanel.add(scaleSlider);
 
-    public void clear() {
-        g2d.setColor(Color.WHITE);
-        g2d.fillRect(0, 0, getWidth(), getHeight());
-        drawCoordinateSystem();
-        drawnPoints.clear();
-        repaint();
-    }
+        JButton drawBtn = new JButton("Нарисовать");
+        JButton clearBtn = new JButton("Очистить");
+        controlPanel.add(drawBtn);
+        controlPanel.add(clearBtn);
 
-    private void drawCoordinateSystem() {
-        g2d.setColor(Color.LIGHT_GRAY);
+        JTextField x1f = new JTextField("2", 3);
+        JTextField y1f = new JTextField("3", 3);
+        JTextField x2f = new JTextField("10", 3);
+        JTextField y2f = new JTextField("7", 3);
+        JTextField radf = new JTextField("7", 3);
+        controlPanel.add(new JLabel("x1:")); controlPanel.add(x1f);
+        controlPanel.add(new JLabel("y1:")); controlPanel.add(y1f);
+        controlPanel.add(new JLabel("x2:")); controlPanel.add(x2f);
+        controlPanel.add(new JLabel("y2:")); controlPanel.add(y2f);
+        controlPanel.add(new JLabel("радиус:")); controlPanel.add(radf);
 
-        for (int x = ORIGIN_X % GRID_SIZE; x < getWidth(); x += GRID_SIZE) {
-            g2d.drawLine(x, 0, x, getHeight());
-        }
-        for (int y = ORIGIN_Y % GRID_SIZE; y < getHeight(); y += GRID_SIZE) {
-            g2d.drawLine(0, y, getWidth(), y);
-        }
+        JLabel timeLabel = new JLabel("Время: -");
+        controlPanel.add(timeLabel);
 
-        g2d.setColor(Color.BLACK);
-        g2d.setStroke(new BasicStroke(2));
-        g2d.drawLine(0, ORIGIN_Y, getWidth(), ORIGIN_Y);
-        g2d.drawLine(ORIGIN_X, 0, ORIGIN_X, getHeight());
+        scaleSlider.addChangeListener(e -> {
+            panel.setScale(scaleSlider.getValue());
+            panel.repaint();
+        });
 
-        g2d.drawString("X", getWidth() - 20, ORIGIN_Y - 10);
-        g2d.drawString("Y", ORIGIN_X + 10, 20);
+        drawBtn.addActionListener(e -> {
+            String alg = (String) algoBox.getSelectedItem();
+            int x1 = Integer.parseInt(x1f.getText());
+            int y1 = Integer.parseInt(y1f.getText());
+            int x2 = Integer.parseInt(x2f.getText());
+            int y2 = Integer.parseInt(y2f.getText());
+            int r  = Integer.parseInt(radf.getText());
 
-        g2d.setFont(new Font("Arial", Font.PLAIN, 10));
-        for (int x = ORIGIN_X + GRID_SIZE; x < getWidth(); x += GRID_SIZE) {
-            if ((x - ORIGIN_X) % (GRID_SIZE * 5) == 0) {
-                g2d.drawString(String.valueOf((x - ORIGIN_X) / GRID_SIZE), x - 5, ORIGIN_Y + 15);
+            long start = System.nanoTime();
+            List<Point> pixels = new ArrayList<>();
+            switch (alg) {
+                case "ЦДА":
+                    pixels = Algorithms.ddaLine(x1,y1,x2,y2);
+                    break;
+                case "Брезенхем (линия)":
+                    pixels = Algorithms.bresenhamLine(x1,y1,x2,y2);
+                    break;
+                case "Брезенхем (окружность)":
+                    pixels = Algorithms.bresenhamCircle(x1,y1,r);
+                    break;
+                case "Пошаговый алгоритм":
+                    pixels = Algorithms.stepByStepLine(x1,y1,x2,y2);
+                    break;
             }
-        }
-        for (int y = ORIGIN_Y + GRID_SIZE; y < getHeight(); y += GRID_SIZE) {
-            if ((y - ORIGIN_Y) % (GRID_SIZE * 5) == 0) {
-                g2d.drawString(String.valueOf(-(y - ORIGIN_Y) / GRID_SIZE), ORIGIN_X + 5, y + 5);
-            }
-        }
+            long end = System.nanoTime();
+            panel.setPixels(pixels);
+
+            updateCoordinatesArea(coordinatesArea, alg, pixels, x1, y1, x2, y2, r, start, end);
+
+            timeLabel.setText(String.format("Время: %d нс (%.3f мс)", (end-start), (end-start)/1e6));
+            panel.repaint();
+        });
+
+        clearBtn.addActionListener(e -> {
+            panel.clear();
+            coordinatesArea.setText("");
+            timeLabel.setText("Время: -");
+        });
     }
 
-    public void drawShape(String algorithm, int x1, int y1, int x2, int y2, int radius, JTextArea calculationArea) {
-        clear();
-
-        long startTime = System.nanoTime();
-
-        switch (algorithm) {
-            case "Пошаговый алгоритм":
-                stepByStepLine(x1, y1, x2, y2);
-                break;
-            case "Алгоритм ЦДА":
-                ddaLine(x1, y1, x2, y2);
-                break;
-            case "Алгоритм Брезенхема (линия)":
-                bresenhamLine(x1, y1, x2, y2);
-                break;
-            case "Алгоритм Брезенхема (окружность)":
-                bresenhamCircle(x1, y1, radius);
-                break;
-        }
-
-        long endTime = System.nanoTime();
+    private static void updateCoordinatesArea(JTextArea area, String algorithm,
+                                              List<Point> pixels, int x1, int y1,
+                                              int x2, int y2, int radius,
+                                              long startTime, long endTime) {
+        StringBuilder sb = new StringBuilder();
         long duration = endTime - startTime;
 
-        StringBuilder calcText = new StringBuilder();
-        calcText.append("Алгоритм: ").append(algorithm).append("\n");
-        calcText.append("Время выполнения: ").append(duration).append(" наносекунд\n");
-        calcText.append("Количество точек: ").append(drawnPoints.size()).append("\n\n");
+        sb.append("Алгоритм: ").append(algorithm).append("\n");
+        sb.append("Время выполнения: ").append(duration).append(" наносекунд\n");
+        sb.append("Количество точек: ").append(pixels.size()).append("\n\n");
 
-        if (!algorithm.equals("Алгоритм Брезенхема (окружность)")) {
-            calcText.append("Координаты отрезка:\n");
-            calcText.append("(").append(x1).append(", ").append(y1).append(") -> (")
+        if (!algorithm.equals("Брезенхем (окружность)")) {
+            sb.append("Координаты отрезка:\n");
+            sb.append("(").append(x1).append(", ").append(y1).append(") -> (")
                     .append(x2).append(", ").append(y2).append(")\n\n");
         } else {
-            calcText.append("Окружность с центром (").append(x1).append(", ").append(y1)
+            sb.append("Окружность с центром (").append(x1).append(", ").append(y1)
                     .append(") и радиусом ").append(radius).append("\n\n");
         }
 
-        calcText.append("Построенные точки (первые 20):\n");
-        int count = Math.min(20, drawnPoints.size());
+        sb.append("Построенные точки:\n");
+        int count = Math.min(50, pixels.size());
         for (int i = 0; i < count; i++) {
-            Point p = drawnPoints.get(i);
-            calcText.append("(").append(p.x).append(", ").append(p.y).append(")\n");
+            Point p = pixels.get(i);
+            sb.append(i + 1).append(": (").append(p.x).append(", ").append(p.y).append(")\n");
         }
-        if (drawnPoints.size() > 20) {
-            calcText.append("... и еще ").append(drawnPoints.size() - 20).append(" точек");
+        if (pixels.size() > 50) {
+            sb.append("... и еще ").append(pixels.size() - 50).append(" точек");
         }
 
-        calculationArea.setText(calcText.toString());
-        repaint();
+        area.setText(sb.toString());
+    }
+}
+
+class RasterPanel extends JPanel {
+    private int scale = 20; 
+    private List<Point> pixels = new ArrayList<>();
+    private boolean showGrid = true;
+
+    public RasterPanel() {
+        setBackground(Color.white);
+        setPreferredSize(new Dimension(800, 600));
     }
 
-    private void stepByStepLine(int x1, int y1, int x2, int y2) {
-        int screenX1 = ORIGIN_X + x1 * GRID_SIZE;
-        int screenY1 = ORIGIN_Y - y1 * GRID_SIZE;
-        int screenX2 = ORIGIN_X + x2 * GRID_SIZE;
-        int screenY2 = ORIGIN_Y - y2 * GRID_SIZE;
+    public void setScale(int s) { this.scale = Math.max(1, s); }
+    public void setPixels(List<Point> p) { this.pixels = p; }
+    public void clear() { this.pixels = new ArrayList<>(); repaint(); }
 
-        if (screenX1 == screenX2) {
-            int startY = Math.min(screenY1, screenY2);
-            int endY = Math.max(screenY1, screenY2);
-            for (int y = startY; y <= endY; y++) {
-                drawPoint(screenX1, y);
-            }
-            return;
-        }
-
-        double k = (double)(screenY2 - screenY1) / (screenX2 - screenX1);
-        double b = screenY1 - k * screenX1;
-
-        if (Math.abs(k) <= 1) {
-            int startX = Math.min(screenX1, screenX2);
-            int endX = Math.max(screenX1, screenX2);
-            for (int x = startX; x <= endX; x++) {
-                int y = (int) Math.round(k * x + b);
-                drawPoint(x, y);
-            }
-        } else {
-            int startY = Math.min(screenY1, screenY2);
-            int endY = Math.max(screenY1, screenY2);
-            for (int y = startY; y <= endY; y++) {
-                int x = (int) Math.round((y - b) / k);
-                drawPoint(x, y);
-            }
-        }
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        drawGridAndAxes(g);
+        drawPixels(g);
     }
 
-    private void ddaLine(int x1, int y1, int x2, int y2) {
-        int screenX1 = ORIGIN_X + x1 * GRID_SIZE;
-        int screenY1 = ORIGIN_Y - y1 * GRID_SIZE;
-        int screenX2 = ORIGIN_X + x2 * GRID_SIZE;
-        int screenY2 = ORIGIN_Y - y2 * GRID_SIZE;
+    private void drawGridAndAxes(Graphics g) {
+        int w = getWidth();
+        int h = getHeight();
+        int cx = w/2;
+        int cy = h/2;
 
-        int dx = screenX2 - screenX1;
-        int dy = screenY2 - screenY1;
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setStroke(new BasicStroke(1f));
+
+        g2.setColor(new Color(220,220,220));
+        for (int x = cx % scale; x < w; x += scale) g2.drawLine(x, 0, x, h);
+        for (int y = cy % scale; y < h; y += scale) g2.drawLine(0, y, w, y);
+
+        g2.setColor(Color.black);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawLine(0, cy, w, cy);
+        g2.drawLine(cx, 0, cx, h);
+
+        g2.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        for (int i = -w/(2*scale)-1; i <= w/(2*scale)+1; i++) {
+            int sx = cx + i*scale;
+            g2.drawLine(sx, cy-4, sx, cy+4);
+            if (i != 0) g2.drawString(Integer.toString(i), sx-6, cy+15);
+        }
+        for (int j = -h/(2*scale)-1; j <= h/(2*scale)+1; j++) {
+            int sy = cy - j*scale;
+            g2.drawLine(cx-4, sy, cx+4, sy);
+            if (j != 0) g2.drawString(Integer.toString(j), cx+6, sy+4);
+        }
+
+        g2.drawString("(0,0)", cx+6, cy+12);
+        g2.drawString("Масштаб: " + scale + " px/ед.", 10, 15);
+    }
+
+    private void drawPixels(Graphics g) {
+        if (pixels == null) return;
+        int w = getWidth();
+        int h = getHeight();
+        int cx = w/2, cy = h/2;
+
+        int pointSize = Math.max(2, scale / 3);
+
+        g.setColor(Color.red);
+        for (Point p : pixels) {
+            int sx = cx + p.x * scale;
+            int sy = cy - p.y * scale;
+            g.fillRect(sx - pointSize/2, sy - pointSize/2, pointSize, pointSize);
+
+            g.setColor(Color.black);
+            g.drawRect(sx - pointSize/2, sy - pointSize/2, pointSize, pointSize);
+            g.setColor(Color.red);
+        }
+    }
+}
+
+class Algorithms {
+    public static List<Point> ddaLine(int x1, int y1, int x2, int y2) {
+        List<Point> pts = new ArrayList<>();
+        int dx = x2 - x1;
+        int dy = y2 - y1;
         int steps = Math.max(Math.abs(dx), Math.abs(dy));
 
         if (steps == 0) {
-            drawPoint(screenX1, screenY1);
-            return;
+            pts.add(new Point(x1, y1));
+            return pts;
         }
 
-        float xIncrement = (float) dx / steps;
-        float yIncrement = (float) dy / steps;
-
-        float x = screenX1;
-        float y = screenY1;
+        double x = x1, y = y1;
+        double xInc = dx / (double) steps;
+        double yInc = dy / (double) steps;
 
         for (int i = 0; i <= steps; i++) {
-            drawPoint(Math.round(x), Math.round(y));
-            x += xIncrement;
-            y += yIncrement;
+            pts.add(new Point((int)Math.round(x), (int)Math.round(y)));
+            x += xInc;
+            y += yInc;
         }
+        return pts;
     }
 
-    private void bresenhamLine(int x1, int y1, int x2, int y2) {
-        int screenX1 = ORIGIN_X + x1 * GRID_SIZE;
-        int screenY1 = ORIGIN_Y - y1 * GRID_SIZE;
-        int screenX2 = ORIGIN_X + x2 * GRID_SIZE;
-        int screenY2 = ORIGIN_Y - y2 * GRID_SIZE;
-
-        int dx = Math.abs(screenX2 - screenX1);
-        int dy = Math.abs(screenY2 - screenY1);
-
-        int sx = screenX1 < screenX2 ? 1 : -1;
-        int sy = screenY1 < screenY2 ? 1 : -1;
-
+    public static List<Point> bresenhamLine(int x1, int y1, int x2, int y2) {
+        List<Point> pts = new ArrayList<>();
+        int dx = Math.abs(x2 - x1);
+        int dy = Math.abs(y2 - y1);
+        int sx = x1 < x2 ? 1 : -1;
+        int sy = y1 < y2 ? 1 : -1;
         int err = dx - dy;
-        int currentX = screenX1;
-        int currentY = screenY1;
+
+        int currentX = x1;
+        int currentY = y1;
 
         while (true) {
-            drawPoint(currentX, currentY);
-
-            if (currentX == screenX2 && currentY == screenY2) break;
+            pts.add(new Point(currentX, currentY));
+            if (currentX == x2 && currentY == y2) break;
 
             int err2 = 2 * err;
 
@@ -336,55 +271,77 @@ class AlgorithmPanel extends JPanel {
                 currentY += sy;
             }
         }
+        return pts;
     }
 
-    private void bresenhamCircle(int xc, int yc, int r) {
-        int screenXc = ORIGIN_X + xc * GRID_SIZE;
-        int screenYc = ORIGIN_Y - yc * GRID_SIZE;
-        int screenR = r * GRID_SIZE;
-
+    public static List<Point> bresenhamCircle(int xc, int yc, int r) {
+        List<Point> pts = new ArrayList<>();
         int x = 0;
-        int y = screenR;
-        int d = 3 - 2 * screenR;
+        int y = r;
+        int d = 3 - 2 * r;
 
-        drawCirclePoints(screenXc, screenYc, x, y);
+        add8(pts, xc, yc, x, y);
 
-        while (y >= x) {
+        while (x <= y) {
             x++;
-
-            if (d > 0) {
-                y--;
-                d = d + 4 * (x - y) + 10;
-            } else {
+            if (d <= 0) {
                 d = d + 4 * x + 6;
+            } else {
+                d = d + 4 * (x - y) + 10;
+                y--;
+            }
+            add8(pts, xc, yc, x, y);
+        }
+        return pts;
+    }
+
+    public static List<Point> stepByStepLine(int x1, int y1, int x2, int y2) {
+        List<Point> points = new ArrayList<>();
+
+        int dx = x2 - x1;
+        int dy = y2 - y1;
+
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            if (x1 > x2) {
+                int temp = x1; x1 = x2; x2 = temp;
+                temp = y1; y1 = y2; y2 = temp;
+                dx = -dx; dy = -dy;
             }
 
-            drawCirclePoints(screenXc, screenYc, x, y);
+            float k = (float) dy / dx;
+            float y = y1;
+
+            for (int x = x1; x <= x2; x++) {
+                points.add(new Point(x, Math.round(y)));
+                y += k;
+            }
+        } else {
+            if (y1 > y2) {
+                int temp = x1; x1 = x2; x2 = temp;
+                temp = y1; y1 = y2; y2 = temp;
+                dx = -dx; dy = -dy;
+            }
+
+            float k = (float) dx / dy;
+            float x = x1;
+
+            for (int y = y1; y <= y2; y++) {
+                points.add(new Point(Math.round(x), y));
+                x += k;
+            }
         }
+
+        return points;
     }
 
-    private void drawCirclePoints(int xc, int yc, int x, int y) {
-        drawPoint(xc + x, yc + y);
-        drawPoint(xc - x, yc + y);
-        drawPoint(xc + x, yc - y);
-        drawPoint(xc - x, yc - y);
-        drawPoint(xc + y, yc + x);
-        drawPoint(xc - y, yc + x);
-        drawPoint(xc + y, yc - x);
-        drawPoint(xc - y, yc - x);
-    }
-
-    private void drawPoint(int x, int y) {
-        if (x >= 0 && x < getWidth() && y >= 0 && y < getHeight()) {
-            g2d.setColor(Color.RED);
-            g2d.fillRect(x - 1, y - 1, 3, 3);
-            drawnPoints.add(new Point(x, y));
-        }
-    }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        g.drawImage(buffer, 0, 0, this);
+    private static void add8(List<Point> pts, int xc, int yc, int x, int y) {
+        pts.add(new Point(xc + x, yc + y));
+        pts.add(new Point(xc - x, yc + y));
+        pts.add(new Point(xc + x, yc - y));
+        pts.add(new Point(xc - x, yc - y));
+        pts.add(new Point(xc + y, yc + x));
+        pts.add(new Point(xc - y, yc + x));
+        pts.add(new Point(xc + y, yc - x));
+        pts.add(new Point(xc - y, yc - x));
     }
 }
